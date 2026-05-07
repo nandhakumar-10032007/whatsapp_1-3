@@ -180,7 +180,6 @@ class _HomePageState extends State<HomePage> {
           "users",
           arrayContains: currentUserId,
         )
-        
             .snapshots(),
 
         builder: (context, snapshot) {
@@ -305,6 +304,20 @@ class _HomePageState extends State<HomePage> {
           // Chat List
           var chats = snapshot.data!.docs;
 
+          // Manual Sorting
+          chats.sort((a, b) {
+
+            Timestamp timeA =
+                a["lastMessageTime"] ??
+                    Timestamp.now();
+
+            Timestamp timeB =
+                b["lastMessageTime"] ??
+                    Timestamp.now();
+
+            return timeB.compareTo(timeA);
+          });
+
           return ListView.builder(
 
             padding: const EdgeInsets.only(
@@ -327,24 +340,42 @@ class _HomePageState extends State<HomePage> {
                     (id) => id != currentUserId,
               );
 
+              bool isUnread =
+                  chat["lastSenderId"] != currentUserId &&
+                      chat["isSeen"] == false;
+
               return FutureBuilder<DocumentSnapshot>(
 
                 future: FirebaseFirestore.instance
                     .collection("Users")
+                    .doc(currentUserId)
+                    .collection("contacts")
                     .doc(receiverId)
                     .get(),
 
                 builder: (context, userSnapshot) {
 
-                  if (!userSnapshot.hasData ||
-                      userSnapshot.data!.data() == null) {
+                  Map<String, dynamic> userData = {};
 
-                    return const SizedBox();
+                  if (userSnapshot.hasData &&
+                      userSnapshot.data!.data() != null) {
+
+                    userData =
+                    userSnapshot.data!.data()
+                    as Map<String, dynamic>;
                   }
 
-                  var userData =
-                  userSnapshot.data!.data()
-                  as Map<String, dynamic>;
+                  // Contact Name Priority
+                  String userName =
+                      userData["userName"] ??
+                          chat["senderName"] ??
+                          "Unknown User";
+
+                  // Contact Image Priority
+                  String userImage =
+                      userData["image"] ??
+                          chat["senderImage"] ??
+                          "";
 
                   return Container(
 
@@ -388,26 +419,16 @@ class _HomePageState extends State<HomePage> {
                         Colors.green.shade100,
 
                         backgroundImage:
-                        userData["image"] != null &&
-                            userData["image"]
-                                .toString()
-                                .isNotEmpty
-
-                            ? NetworkImage(
-                          userData["image"],
-                        )
-
+                        userImage.isNotEmpty
+                            ? NetworkImage(userImage)
                             : null,
 
                         child:
-                        userData["image"] == null ||
-                            userData["image"]
-                                .toString()
-                                .isEmpty
+                        userImage.isEmpty
 
                             ? Text(
 
-                          userData["userName"][0]
+                          userName[0]
                               .toUpperCase(),
 
                           style: const TextStyle(
@@ -423,10 +444,14 @@ class _HomePageState extends State<HomePage> {
 
                       title: Text(
 
-                        userData["userName"],
+                        userName,
 
-                        style: const TextStyle(
-                          fontWeight: FontWeight.bold,
+                        style: TextStyle(
+
+                          fontWeight: isUnread
+                              ? FontWeight.bold
+                              : FontWeight.w600,
+
                           fontSize: 17,
                         ),
                       ),
@@ -446,8 +471,14 @@ class _HomePageState extends State<HomePage> {
                           TextOverflow.ellipsis,
 
                           style: TextStyle(
-                            color:
-                            Colors.grey.shade700,
+
+                            color: isUnread
+                                ? Colors.black
+                                : Colors.grey.shade700,
+
+                            fontWeight: isUnread
+                                ? FontWeight.bold
+                                : FontWeight.normal,
                           ),
                         ),
                       ),
@@ -457,32 +488,88 @@ class _HomePageState extends State<HomePage> {
                         mainAxisAlignment:
                         MainAxisAlignment.center,
 
+                        crossAxisAlignment:
+                        CrossAxisAlignment.end,
+
                         children: [
 
+                          // Message Time
                           Text(
 
-                            "Now",
+                            chat["lastMessageTime"] != null
+
+                                ? TimeOfDay.fromDateTime(
+                              (chat["lastMessageTime"]
+                              as Timestamp)
+                                  .toDate(),
+                            ).format(context)
+
+                                : "",
 
                             style: TextStyle(
-                              color:
-                              Colors.green.shade700,
+
+                              color: isUnread
+                                  ? Colors.green
+                                  : Colors.grey,
+
                               fontSize: 12,
+
                               fontWeight:
                               FontWeight.bold,
                             ),
                           ),
 
-                          const SizedBox(height: 5),
+                          const SizedBox(height: 6),
 
-                          const Icon(
-                            Icons.done_all,
-                            color: Colors.blue,
-                            size: 20,
-                          ),
+                          // Unread Badge
+                          if (isUnread)
+
+                            Container(
+
+                              padding:
+                              const EdgeInsets.all(7),
+
+                              decoration:
+                              const BoxDecoration(
+
+                                color: Colors.green,
+
+                                shape: BoxShape.circle,
+                              ),
+
+                              child: const Text(
+
+                                "1",
+
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 11,
+                                  fontWeight:
+                                  FontWeight.bold,
+                                ),
+                              ),
+                            )
+
+                          else
+
+                            const Icon(
+                              Icons.done_all,
+                              color: Colors.blue,
+                              size: 20,
+                            ),
                         ],
                       ),
 
-                      onTap: () {
+                      onTap: () async {
+
+                        // Mark Seen
+                        await FirebaseFirestore.instance
+                            .collection("chats")
+                            .doc(chats[index].id)
+                            .update({
+
+                          "isSeen": true,
+                        });
 
                         Navigator.push(
 
@@ -497,7 +584,7 @@ class _HomePageState extends State<HomePage> {
                                   receiverId,
 
                                   receiverName:
-                                  userData["userName"],
+                                  userName,
                                 ),
                           ),
                         );

@@ -34,6 +34,7 @@ class _RegisterPageState extends State<RegisterPage> {
 
   Future<void> registerUser() async {
 
+    // Empty Validation
     if (userNameController.text.trim().isEmpty ||
         emailController.text.trim().isEmpty ||
         passwordController.text.trim().isEmpty ||
@@ -51,11 +52,56 @@ class _RegisterPageState extends State<RegisterPage> {
       return;
     }
 
+    // Phone Number Validation
+    if (phoneController.text.trim().length != 10) {
+
+      ScaffoldMessenger.of(context).showSnackBar(
+
+        const SnackBar(
+          content: Text(
+            "Phone number must contain 10 digits",
+          ),
+        ),
+      );
+
+      return;
+    }
+
     try {
 
       setState(() {
         isLoading = true;
       });
+
+      // Check Phone Number Already Exists
+      QuerySnapshot phoneCheck =
+      await FirebaseFirestore.instance
+          .collection("allContacts")
+          .where(
+        "phoneNumber",
+        isEqualTo:
+        phoneController.text.trim(),
+      )
+          .get();
+
+      if (phoneCheck.docs.isNotEmpty) {
+
+        setState(() {
+          isLoading = false;
+        });
+
+        ScaffoldMessenger.of(context)
+            .showSnackBar(
+
+          const SnackBar(
+            content: Text(
+              "Phone number already registered",
+            ),
+          ),
+        );
+
+        return;
+      }
 
       // Firebase Authentication
       UserCredential userCredential =
@@ -105,8 +151,14 @@ class _RegisterPageState extends State<RegisterPage> {
 
         "uid": uid,
 
+        "userName":
+        userNameController.text.trim(),
+
         "phoneNumber":
         phoneController.text.trim(),
+
+        "email":
+        emailController.text.trim(),
       });
 
       setState(() {
@@ -139,13 +191,35 @@ class _RegisterPageState extends State<RegisterPage> {
         isLoading = false;
       });
 
-      ScaffoldMessenger.of(context).showSnackBar(
+      String errorMessage =
+          "Registration Failed";
+
+      // Email Already Exists
+      if (e.code == "email-already-in-use") {
+
+        errorMessage =
+        "Email already registered";
+      }
+
+      // Weak Password
+      else if (e.code == "weak-password") {
+
+        errorMessage =
+        "Password must contain at least 6 characters";
+      }
+
+      // Invalid Email
+      else if (e.code == "invalid-email") {
+
+        errorMessage =
+        "Invalid email address";
+      }
+
+      ScaffoldMessenger.of(context)
+          .showSnackBar(
 
         SnackBar(
-          content: Text(
-            e.message ??
-                "Registration Failed",
-          ),
+          content: Text(errorMessage),
         ),
       );
     }
@@ -324,7 +398,7 @@ class _RegisterPageState extends State<RegisterPage> {
                 icon: Icons.phone,
 
                 keyboardType:
-                TextInputType.phone,
+                TextInputType.number,
               ),
 
               const SizedBox(height: 18),

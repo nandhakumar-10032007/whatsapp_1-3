@@ -66,24 +66,45 @@ class _ChatPageState extends State<ChatPage> {
         .add(messageData);
 
     // Save Last Message
-    await FirebaseFirestore.instance
-        .collection("chats")
-        .doc(chatRoomId)
-        .set({
+   DocumentSnapshot currentUserData =
+await FirebaseFirestore.instance
+    .collection("Users")
+    .doc(currentUserId)
+    .get();
 
-      "users": [
-        currentUserId,
-        widget.receiverId,
-      ],
+var currentUser =
+currentUserData.data()
+as Map<String, dynamic>;
 
-      "lastMessage":
-      messageController.text.trim(),
+await FirebaseFirestore.instance
+    .collection("chats")
+    .doc(chatRoomId)
+    .set({
 
-      "lastMessageTime":
-      Timestamp.now(),
+  "users": [
+    currentUserId,
+    widget.receiverId,
+  ],
 
-    });
+  "lastMessage":
+  messageController.text.trim(),
 
+  "lastMessageTime":
+  Timestamp.now(),
+
+  "lastSenderId":
+  currentUserId,
+
+  "isSeen": false,
+
+  // Sender Details
+  "senderName":
+  currentUser["userName"],
+
+  "senderImage":
+  currentUser["image"],
+
+}, SetOptions(merge: true));
     messageController.clear();
   }
 
